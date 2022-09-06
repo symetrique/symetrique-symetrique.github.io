@@ -1,0 +1,58 @@
+import netmiko
+import re
+from functions import connect_switch
+ 
+# Connect_switch is from another .py that login to the device
+connect_switch()
+ 
+device = connect_switch()
+ 
+net_connect = netmiko.ConnectHandler(**device)
+net_connect.enable()
+command = net_connect.send_command('show cdp neighbors detail')
+net_connect.disconnect()
+ 
+output = command.split('\n')
+print(output)
+ 
+find_devices = [output.index(i) for i in output if 'Device ID:' in i]
+find_ips = [output.index(i) for i in output if 'IP address:' in i]
+find_ips = list(dict.fromkeys(find_ips)) #Had to add this line. To not have dublicate returns in my find_ips list. Without this it returns <class 'list'>: [3, 3, 25, 25]
+find_platform = [output.index(i) for i in output if 'Platform: cisco ' in i]
+find_src_int = [output.index(i) for i in output if 'Interface:' in i]
+find_dst_int = [output.index(i) for i in output if '(outgoing port):' in i]
+find_vtp = [output.index(i) for i in output if 'VTP Management Domain:' in i]
+ 
+for i in find_devices:
+    dev = re.match(r'Device ID: (.*)', output[i].rstrip(), re.M | re.I)
+    if dev:
+        device = dev.group(1)
+        print('Device is: ' + device)
+ 
+for i in find_ips:
+    ip_adr = re.match(r'  IP address: (.*)', output[i].rstrip(), re.M | re.I)
+    if ip_adr:
+        ip_address = ip_adr.group(1)
+        print('IP is: ' + ip_address)
+ 
+# for some reason the find_platform returns <class 'list'>: [4, 4] where i would have expected [4, 26]
+# Dont know if its because its the same platform on both devices
+for i in find_platform:
+    plat = re.match(r'(.*): (.*),', output[i].rstrip(), re.M | re.I)
+    if plat:
+        platform = plat.group(2)
+        print('Remote Switch model is: ' + platform)
+ 
+for i in find_src_int:
+    int = re.match(r'Interface: (.*),  (.*) (.*) (.*)', output[i].rstrip(), re.M | re.I)
+    if int:
+        src_int = int.group(1)
+        dst_int = int.group(4)
+        print('Src Int is: ' + src_int)
+        print('Dst Int is: ' + dst_int)
+ 
+for i in find_vtp:
+    vtp = re.match(r"VTP Management Domain: '(.*)'", output[i].rstrip(), re.M | re.I)
+    if vtp:
+        vtp_domain = vtp.group(1)
+        print('VTP is: ' + vtp_domain)
